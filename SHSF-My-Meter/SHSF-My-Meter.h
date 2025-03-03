@@ -1,0 +1,30 @@
+// all # define options should be defined here,  this keeps them together in a nice way.
+//
+// for OLED
+#define OLED_WIDTH 128 // OLED display width, in pixels
+#define OLED_HEIGHT 32 // OLED display height, in pixels
+#define OLED_RESET -1 // Reset pin # (or -1 if sharing Arduino reset pin)
+#define ROW_1 0
+#define ROW_2 12
+#define ROW_3 24
+//
+// for BME280
+#define SEALEVELPRESSURE_HPA (1013.25)
+//
+// for communications
+const unsigned long COM_BAUD_RATE = 115200;
+//
+struct button {
+  unsigned long previousMillis; // time since last button press.
+  unsigned long interval; // interval at which to look for new press (de-bounce).
+};
+//--------------------- I2C Addresses ----------------------
+// MAX17048 Battery Monitor (0x0c), cannot change.
+// BME280 Temp/Hum/Pres Sensor (0x77), cannot change.
+// INA219 Current Sensor (0x40), can change to 0x41, 0x44 or 0x45.
+#define OLED_I2C_ADDR 0x3C
+//
+//-------------------- Pin assignments ---------------------
+#define BUTTON_A  9
+#define BUTTON_B  6
+#define BUTTON_C  5
