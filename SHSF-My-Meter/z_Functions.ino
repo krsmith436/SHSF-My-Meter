@@ -2,17 +2,6 @@
 //
 void dsplyValues(void) { // This is the main function.
   if (blnLogoTimedOut) {
-    uint8_t rh = 13; // row height.
-    uint8_t c1 = 7; // column 1 start, Cab.
-    uint8_t c2 = 30; // column 2 start, Throttle. (3 chartacters = 33)
-    uint8_t c3 = 75; // column 3 start, Direction.
-    uint8_t c4 = 104; // column 4 start, Engine Facing.
-    uint8_t bh = 19; // bar height, Throttle.
-    uint8_t bw = 65; // bar width, Throttle.
-    uint8_t bs = 128 - bw; // bar start, Throttle.
-    uint8_t iw = 14; // icon width, Direction.
-    uint8_t is = bs - iw - 3; // icon start, Direction.
-    //
     float cellVoltage = maxlipo.cellVoltage();
     if (isnan(cellVoltage)) {
       Serial.println("Failed to read cell voltage, check battery is connected!");
@@ -35,12 +24,27 @@ void dsplyValues(void) { // This is the main function.
     //
     // show data on OLED
     display.clearDisplay();
-    display.setCursor(0, ROW_1); display.print(bme.readTemperature()); display.println(F(" C"));
-    display.setCursor(65, ROW_1); display.print(bme.readPressure() / 100.0F); display.println(F(" hPa"));
-    display.setCursor(0, ROW_2); display.print(bme.readHumidity()); display.println(F(" %"));
-    display.setCursor(65, ROW_2); display.print(bme.readAltitude(SEALEVELPRESSURE_HPA)); display.println(F(" m"));
-    display.setCursor(0, ROW_3); display.print(cellVoltage, 1); display.println(F(" V"));
-    display.setCursor(65, ROW_3); display.print(maxlipo.cellPercent(), 1); display.print(F(" %"));
+    switch (dsplyMode) {
+      case WEATHER:
+        display.setCursor(0, ROW_1); display.print((blnMetricUnit) ? bme.readTemperature() : ((bme.readTemperature() * 1.8) + 32), 1); display.print((blnMetricUnit) ? " C" : " F");
+        display.setCursor(65, ROW_1); display.print(bme.readPressure() / 100.0F); display.print(F(" hPa"));
+        display.setCursor(0, ROW_2); display.print(bme.readHumidity(), 1); display.print(F(" %"));
+        display.setCursor(65, ROW_2); display.print(bme.readAltitude(SEALEVELPRESSURE_HPA)); display.print(F(" m"));
+        display.setCursor(0, ROW_3); display.print(F("Batt: ")); display.print(cellVoltage, 2); display.print(F(" V"));
+        display.setCursor(86, ROW_3); display.print(maxlipo.cellPercent(), 1); display.print(F(" %"));
+        break;
+      case BATTERY:
+        display.setCursor(0, ROW_1); display.print(F("ChgRate: ")); display.print(maxlipo.chargeRate(), 1); display.print(F(" %/hr"));
+        display.setCursor(0, ROW_3); display.print(F("Batt: ")); display.print(cellVoltage, 2); display.print(F(" V"));
+        display.setCursor(86, ROW_3); display.print(maxlipo.cellPercent(), 1); display.print(F(" %"));
+        break;
+      case CURRENT:
+        display.setCursor(0, ROW_2); display.print(F("Under Construction"));
+        break;
+      default:
+        dsplyMode = 0;
+        break;
+    }
     display.display();
   }
 }
@@ -77,6 +81,15 @@ void handleBatteryAlert(uint8_t status_flags) {
   Serial.println();
 }
 //
+//
+void setupButtons(void) {
+  buttonA.previousMillis = 0;
+  buttonA.interval = 2000;
+  buttonB.previousMillis = 0;
+  buttonB.interval = 2000;
+  buttonC.previousMillis = 0;
+  buttonC.interval = 2000;
+}//
 //
 void LogoTimedOut(void) {
   blnLogoTimedOut = true;

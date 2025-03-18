@@ -24,6 +24,7 @@
 #include <Adafruit_SSD1306.h> // for OLED FeatherWing display.
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h> // for Temperature/Humidity/Pressure Sensor.
+#include <INA219_WE.h> // for INA219 Current Sensor.
 #include <Ticker.h> // for Ticker callbacks, which can call a function in a predetermined interval.
 #include "SHSF-My-Meter.h"
 //
@@ -31,12 +32,16 @@
 Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, OLED_RESET);
 Adafruit_MAX17048 maxlipo;
 Adafruit_BME280 bme; // I2C
+INA219_WE ina219 = INA219_WE(INA219_I2C_ADDR);
 //
 //--------------------GLOBAL VARIABLES----------------------//
 struct button buttonA;
 struct button buttonB;
 struct button buttonC;
 bool blnLogoTimedOut = false; // flag for indicating the logo has timed out.
+bool blnMetricUnit = false; // flag for indicating metric units for display.
+uint8_t dsplyMode = 0; // integer for display mode.
+float currentHighValue_mA = 0.0; // value for INA219 Current Sensor.
 //
 //-------------------------Ticker---------------------------//
 Ticker timerLogo;
@@ -104,6 +109,7 @@ void setup() {
   timerRefreshDisplay.attach(2, dsplyValues);
   //
   // Setup buttons
+  setupButtons();
   pinMode(BUTTON_A, INPUT_PULLUP);
   pinMode(BUTTON_B, INPUT_PULLUP);
   pinMode(BUTTON_C, INPUT_PULLUP);
@@ -112,9 +118,24 @@ void setup() {
 }
 
 void loop() {
-  if(!digitalRead(BUTTON_A)) display.print("A");
-  if(!digitalRead(BUTTON_B)) display.print("B");
-  if(!digitalRead(BUTTON_C)) display.print("C");
-  yield();
-  display.display();
+  if(!digitalRead(BUTTON_A)) {
+    if ((millis() - buttonA.previousMillis) >= buttonA.interval){
+      blnMetricUnit = !blnMetricUnit;
+      buttonA.previousMillis = millis();
+    }
+  }
+  if(!digitalRead(BUTTON_B)) {
+    if ((millis() - buttonB.previousMillis) >= buttonB.interval){
+      //
+      buttonB.previousMillis = millis();
+    }
+  }
+  if(!digitalRead(BUTTON_C)) {
+    if ((millis() - buttonC.previousMillis) >= buttonC.interval){
+      dsplyMode = (dsplyMode >= NUM_MODES) ? 0: (dsplyMode + 1);
+      //
+      buttonC.previousMillis = millis();
+    }
+  }
+  yield(); // allow other processes to run.
 }
