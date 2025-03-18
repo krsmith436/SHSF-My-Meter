@@ -1,5 +1,11 @@
 // all # define options should be defined here,  this keeps them together in a nice way.
 //
+// for display modes
+const uint8_t WEATHER = 0;
+const uint8_t CURRENT = 1;
+const uint8_t BATTERY = 2;
+const uint8_t NUM_MODES = 2; // number of modes, starting at zero.
+//
 // for OLED
 #define OLED_WIDTH 128 // OLED display width, in pixels
 #define OLED_HEIGHT 32 // OLED display height, in pixels
@@ -21,8 +27,8 @@ struct button {
 //--------------------- I2C Addresses ----------------------
 // MAX17048 Battery Monitor (0x0c), cannot change.
 // BME280 Temp/Hum/Pres Sensor (0x77), cannot change.
-// INA219 Current Sensor (0x40), can change to 0x41, 0x44 or 0x45.
-#define OLED_I2C_ADDR 0x3C
+#define OLED_I2C_ADDR 0x3C // Address 0x3C for 128x32.
+#define INA219_I2C_ADDR 0x40 // can change to 0x41, 0x44 or 0x45.
 //
 //-------------------- Pin assignments ---------------------
 #define BUTTON_A  9
