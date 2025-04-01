@@ -6,6 +6,16 @@ const uint8_t CURRENT = 1;
 const uint8_t BATTERY = 2;
 const uint8_t NUM_MODES = 2; // number of modes, starting at zero.
 //
+// for display interval, IN Seconds
+const float INTERVAL_WEATHER = 2; // value in seconds.
+const float INTERVAL_BATTERY = 2; // value in seconds.
+const float INTERVAL_FAST_CURRENT = 0.001; // value in seconds.
+const float INTERVAL_SLOW_CURRENT = 1; // value in seconds.
+//
+// for RGB LED
+const float RGB_LED_BRIGHTNESS = 25;
+const float RGB_ON_TIME = 0.03; // value in seconds.
+//
 // for OLED
 #define OLED_WIDTH 128 // OLED display width, in pixels
 #define OLED_HEIGHT 32 // OLED display height, in pixels
