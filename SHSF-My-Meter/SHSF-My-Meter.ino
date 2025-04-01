@@ -44,7 +44,7 @@ bool blnLogoTimedOut = false; // flag for indicating the logo has timed out.
 bool blnUpdateDisplay = false; // flag to update the display values.
 bool blnMetricUnit = false; // flag for indicating metric units for display.
 uint8_t dsplyMode = 0; // integer for display mode.
-float updateIntervalSeconds = 2; // value in seconds to update the display mode values.
+float updateIntervalSeconds = INTERVAL_WEATHER; // value in seconds to update the display values.
 float currentHighValue_mA = 0.0; // value for INA219 Current Sensor.
 bool blnFoundOLED = false; // flag for result of begin statement of sensor.
 bool blnFoundBME280 = false; // flag for result of begin statement of sensor.
@@ -54,6 +54,7 @@ bool blnFoundINA219 = false; // flag for result of begin statement of sensor.
 //-------------------------Ticker---------------------------//
 Ticker timerLogo;
 Ticker timerRefreshDisplay;
+Ticker timerRgbOnTime;
 //
 void setup() {
   unsigned long timeout = 5000; // Serial() timeout in milliseconds.
@@ -253,6 +254,13 @@ void loop() {
   }
   else if(!digitalRead(BUTTON_B)) {
     if ((millis() - buttonB.previousMillis) >= buttonB.interval){
+      if (dsplyMode == CURRENT) {
+        if (updateIntervalSeconds == INTERVAL_SLOW_CURRENT) {
+          changeUpdateInterval(INTERVAL_FAST_CURRENT); // value in seconds.
+        } else {
+          changeUpdateInterval(INTERVAL_SLOW_CURRENT); // value in seconds.
+        }
+      }
       //
       DisplayValues();
       //
