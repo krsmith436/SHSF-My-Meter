@@ -1,5 +1,7 @@
 void DisplayValues(void) { // This is the main function.
   //
+  display.clearDisplay();
+  //
   switch (dsplyMode) {
     case WEATHER:
       rgbLedWrite(RGB_BUILTIN, 0, RGB_LED_BRIGHTNESS, 0);  // Green
@@ -29,6 +31,7 @@ void DisplayValues(void) { // This is the main function.
       dsplyMode = 0;
       break;
   }
+  display.display();
 }
 //
 //
@@ -36,6 +39,45 @@ void changeUpdateInterval(float newInterval) {
   timerRefreshDisplay.detach(); // Stop the current ticker
   updateIntervalSeconds = newInterval;
   timerRefreshDisplay.attach(updateIntervalSeconds, UpdateDisplay); // Reattach with new interval
+}
+//
+//
+void ReadWeatherSensor(void) {
+  float si7021Temperature = 0;
+  float si7021Humidity = 0;
+  //
+  display.setCursor(0, ROW_3);
+  dsplyTime();
+  //
+  if (!blnFoundBME280) {
+    Serial.println(F("No BME280 Sensor Data!"));
+    //
+    display.setCursor(0, ROW_2); display.print(F("BME280 not found!"));
+  } else {
+    Serial.print(F("BME280 Temperature = ")); Serial.print(bme.readTemperature()); Serial.println(F(" °C"));
+    Serial.print(F("BME280 Pressure = ")); Serial.print(bme.readPressure() / 100.0F); Serial.println(F(" hPa"));
+    Serial.print(F("BME280 Approx. Altitude = ")); Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA)); Serial.println(F(" m"));
+    Serial.println("***");
+    //
+    display.setCursor(0, ROW_2); display.print((blnMetricUnit) ? bme.readAltitude(SEALEVELPRESSURE_HPA) : (bme.readAltitude(SEALEVELPRESSURE_HPA) * 3.28), 1); display.print((blnMetricUnit) ? " m" : " ft");
+    display.setCursor(65, ROW_2); display.print(bme.readPressure() / 100.0F); display.print(F(" hPa"));
+  }
+  if (!blnFoundSI7021) {
+    Serial.println(F("No Si7021 Sensor Data!"));
+    //
+    display.setCursor(0, ROW_1); display.print(F("Si7021 not found!"));
+  } else {
+    si7021Temperature = si7021.readTemperature();
+    si7021Humidity = si7021.readHumidity();
+    //
+    Serial.print(F("Si7021 Temperature = ")); Serial.print((blnMetricUnit) ? si7021Temperature : ((si7021Temperature * 1.8) + 32), 1); Serial.println((blnMetricUnit) ? " C" : " F");
+    Serial.print(F("Si7021 Humidity = ")); Serial.print(si7021Humidity); Serial.println(F(" %"));
+    //
+    display.setCursor(0, ROW_1); display.print((blnMetricUnit) ? si7021Temperature : ((si7021Temperature * 1.8) + 32), 1); display.print((blnMetricUnit) ? " C" : " F");
+    display.setCursor(65, ROW_1); display.print(si7021Humidity, 1); display.print(F(" %"));
+  }
+  Serial.print(F("Update Interval = ")); Serial.print(updateIntervalSeconds, 3); Serial.println(F(" sec"));
+  Serial.println();
 }
 //
 //
@@ -59,11 +101,9 @@ void ReadBatteryMonitor(void) {
   Serial.println();
   //
   //  show data on OLED
-  display.clearDisplay();
   display.setCursor(0, ROW_1); display.print(F("   Batt: ")); display.print(cellVoltage, 2); display.print(F(" V"));
   display.setCursor(0, ROW_2); display.print(F(" Charge: ")); display.print(cellCharge, 1); display.print(F(" %"));
   display.setCursor(0, ROW_3); display.print(F("ChgRate: ")); display.print(cellChargeRate, 1); display.print(F(" %/hr"));
-  display.display();
 }
 //
 //
@@ -74,8 +114,6 @@ void ReadCurrentSensor(void) {
   float current_mA = 0.0;
   float power_mW = 0.0; 
   bool ina219_overflow = false;
-  //
-  display.clearDisplay();
   //
   if (!blnFoundINA219) {
     Serial.println(F("No Current Sensor Data!"));
@@ -117,48 +155,6 @@ void ReadCurrentSensor(void) {
     display.setCursor(80, ROW_2); display.print(updateIntervalSeconds * 1000.0F, 0); display.print(" ms");
     display.setCursor(0, ROW_3); display.print(currentHighValue_mA); display.print(" max");
   }
-  //
-  display.display();
-}
-//
-//
-void ReadWeatherSensor(void) {
-  float si7021Temperature = 0;
-  float si7021Humidity = 0;
-  //
-  display.clearDisplay();
-  //
-  if (!blnFoundBME280) {
-    Serial.println(F("No BME280 Sensor Data!"));
-    //
-    display.setCursor(0, ROW_3); display.print(F("BME280 not found!"));
-  } else {
-    Serial.print(F("BME280 Temperature = ")); Serial.print(bme.readTemperature()); Serial.println(F(" °C"));
-    Serial.print(F("BME280 Pressure = ")); Serial.print(bme.readPressure() / 100.0F); Serial.println(F(" hPa"));
-    Serial.print(F("BME280 Approx. Altitude = ")); Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA)); Serial.println(F(" m"));
-    Serial.println("***");
-    //
-    display.setCursor(0, ROW_1); display.print((blnMetricUnit) ? bme.readTemperature() : ((bme.readTemperature() * 1.8) + 32), 1); display.print((blnMetricUnit) ? " C" : " F");
-    display.setCursor(65, ROW_1); display.print(bme.readPressure() / 100.0F); display.print(F(" hPa"));
-    display.setCursor(0, ROW_2); display.print((blnMetricUnit) ? bme.readAltitude(SEALEVELPRESSURE_HPA) : (bme.readAltitude(SEALEVELPRESSURE_HPA) * 3.28), 1); display.print((blnMetricUnit) ? " m" : " ft");
-  }
-  if (!blnFoundSI7021) {
-    Serial.println(F("No Si7021 Sensor Data!"));
-    //
-    display.setCursor(0, ROW_3); display.print(F("Si7021 not found!"));
-  } else {
-    si7021Temperature = si7021.readTemperature();
-    si7021Humidity = si7021.readHumidity();
-    //
-    Serial.print(F("Si7021 Temperature = ")); Serial.print(si7021Temperature); Serial.println(F(" °C"));
-    Serial.print(F("Si7021 Humidity = ")); Serial.print(si7021Humidity); Serial.println(F(" %"));
-    //
-    display.setCursor(0, ROW_3); display.print((blnMetricUnit) ? si7021Temperature : ((si7021Temperature * 1.8) + 32), 1); display.print((blnMetricUnit) ? " C" : " F");
-    display.setCursor(65, ROW_3); display.print(si7021Humidity, 1); display.print(F(" %"));
-  }
-  Serial.print(F("Update Interval = ")); Serial.print(updateIntervalSeconds, 3); Serial.println(F(" sec"));
-  Serial.println();
-  display.display();
 }
 // 
 //

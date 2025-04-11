@@ -11,6 +11,7 @@
     Ambient Temperature
     Humidity
     Barametric Pressure
+    Altitude
     Battery Voltage
     Battery Charge
     Battery Charge Rate
@@ -27,6 +28,8 @@
 #include "Adafruit_Si7021.h" // for Temperature/Humidity Sensor.
 #include <INA219_WE.h> // for INA219 Current Sensor.
 #include <Ticker.h> // for Ticker callbacks, which can call a function in a predetermined interval.
+#include <WiFi.h> // for Wireless Fidelity (WiFi).
+#include "time.h"
 #include "SHSF-My-Meter.h"
 //
 //-------------------Object Instantiation-------------------//
@@ -51,6 +54,17 @@ bool blnFoundBME280 = false; // flag for result of begin statement of sensor.
 bool blnFoundSI7021 = false; // flag for result of begin statement of sensor.
 bool blnFoundINA219 = false; // flag for result of begin statement of sensor.
 //
+const char *ssid = "Be_My_Guest";
+const char *password = "MyArduinoNetwork";
+const char *ntpServer1 = "pool.ntp.org";
+const char *ntpServer2 = "time.nist.gov";
+const long gmtOffset_sec = -18000;  // Adjust for your timezone
+const int daylightOffset_sec = 3600;
+const char *time_zone = "EST5EDT,M3.2.0,M11.1.0";  // TimeZone rule for America_Detroit
+struct tm timeinfo;
+bool realTimeUpdate = false;
+unsigned long lastMillis;
+//
 //-------------------------Ticker---------------------------//
 Ticker timerLogo;
 Ticker timerRefreshDisplay;
@@ -58,8 +72,12 @@ Ticker timerRgbOnTime;
 //
 void setup() {
   unsigned long timeout = 5000; // Serial() timeout in milliseconds.
-  unsigned long startMillis = millis(); // Record the start time
+  unsigned long startMillis = millis(); // Record the start time for Serial() timeout.
   unsigned status;
+  //
+  // Initialze Ticker
+  timerLogo.once(4, LogoTimedOut); // Run only once.
+  timerRefreshDisplay.attach(2, UpdateDisplay);
   //
   // Initialize OLED display.
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally.
@@ -233,6 +251,8 @@ void setup() {
   pinMode(BUTTON_A, INPUT_PULLUP);
   pinMode(BUTTON_B, INPUT_PULLUP);
   pinMode(BUTTON_C, INPUT_PULLUP);
+  //
+  updateTimeFromNTP();
   //
   Serial.println(F("Setup is complete.\n"));
 }
