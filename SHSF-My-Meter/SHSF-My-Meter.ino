@@ -28,6 +28,7 @@
 #include "Adafruit_Si7021.h" // for Temperature/Humidity Sensor.
 #include <INA219_WE.h> // for INA219 Current Sensor.
 #include <Ticker.h> // for Ticker callbacks, which can call a function in a predetermined interval.
+#include <Preferences.h> // wrapper for EEPROM library used to store WiFi ssid and password.
 #include <WiFi.h> // for Wireless Fidelity (WiFi).
 #include <HTTPClient.h> // for Sea Level Pressure.
 #include <ArduinoJson.h> // for Sea Level Pressure.
@@ -40,14 +41,16 @@ Adafruit_MAX17048 maxlipo;
 Adafruit_BME280 bme; // I2C
 Adafruit_Si7021 si7021 = Adafruit_Si7021();
 INA219_WE ina219 = INA219_WE(INA219_I2C_ADDR);
+Preferences preferences;
 //
 //--------------------GLOBAL VARIABLES----------------------//
-struct button buttonA;
-struct button buttonB;
-struct button buttonC;
+struct button buttonA = {0, 1500};
+struct button buttonB = {0, 2000};
+struct button buttonC = {0, 800};
 bool blnLogoTimedOut = false; // flag to indicate the logo has timed out.
 bool blnUpdateDisplay = false; // flag to update the display values.
 bool blnMetricUnit = false; // flag to indicate metric units for display.
+bool blnDisplaySeaLevelPressure = false; // flag to display sea level pressure.
 bool blnLogData = false; // flag to indicate data is beinf logged.
 uint8_t dsplyMode = 0; // integer to indicate the display mode.
 float updateInterval_sec = INTERVAL_WEATHER; // value in seconds to update the display values.
@@ -112,14 +115,13 @@ void setup() {
   }
   //
   // Setup sensors
-  setupSensors();
+  SetupSensors();
   //
   // Initialze Ticker
   timerLogo.once(4, LogoTimedOut); // Run only once.
   timerRefreshDisplay.attach(2, UpdateDisplay);
   //
   // Setup buttons
-  SetupButtons();
   pinMode(BUTTON_A, INPUT_PULLUP);
   pinMode(BUTTON_B, INPUT_PULLUP);
   pinMode(BUTTON_C, INPUT_PULLUP);
@@ -129,9 +131,9 @@ void setup() {
   //
   // Setup Touch switch
   // This method based on touchInterruptGetLastStatus() is only available for ESP32 S2 and S3
-  touchAttachInterrupt(TOUCH_1, gotTouch1, THRESHOLD);
+  touchAttachInterrupt(TOUCH_1, GotTouch1, THRESHOLD);
   //
-  // Setup time
+  // Setup time and Sea Level Pressure
   GetWifiData();
   //
   Serial.println(F("Setup is complete.\n"));
@@ -151,11 +153,13 @@ void loop() {
     //
     if(!digitalRead(BUTTON_A)) {
       if ((millis() - buttonA.previousMillis) >= buttonA.interval){
-        if (dsplyMode == WEATHER) {
-          blnMetricUnit = !blnMetricUnit;
-        }
-        if (dsplyMode == CURRENT) {
-          currentHighValue_mA = 0;
+        switch (dsplyMode) {
+          case WEATHER:
+            blnMetricUnit = !blnMetricUnit;
+            break;
+          case CURRENT:
+            currentHighValue_mA = 0;
+            break;
         }
         //
         DisplayValues();
@@ -165,12 +169,17 @@ void loop() {
     }
     else if(!digitalRead(BUTTON_B)) {
       if ((millis() - buttonB.previousMillis) >= buttonB.interval){
-        if (dsplyMode == CURRENT) {
+        switch (dsplyMode) {
+          case WEATHER:
+            blnDisplaySeaLevelPressure = !blnDisplaySeaLevelPressure;
+            break;
+          case CURRENT:
           if (updateInterval_sec == INTERVAL_SLOW_CURRENT) {
-            changeUpdateInterval(INTERVAL_FAST_CURRENT); // value in seconds.
+            ChangeUpdateInterval(INTERVAL_FAST_CURRENT); // value in seconds.
           } else {
-            changeUpdateInterval(INTERVAL_SLOW_CURRENT); // value in seconds.
+            ChangeUpdateInterval(INTERVAL_SLOW_CURRENT); // value in seconds.
           }
+            break;
         }
         //
         DisplayValues();
@@ -186,9 +195,6 @@ void loop() {
         //
         buttonC.previousMillis = millis();
       }
-      // else if(touchRead(T10)) {
-
-      // }
     }
     //
     if (blnUpdateDisplay) {

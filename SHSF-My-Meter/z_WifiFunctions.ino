@@ -5,54 +5,62 @@ void GetWifiData(void) {
   unsigned long startMillis = millis(); // start time for timeout.
   bool connected = true;
   //
-  WiFi.begin(ssid, password);
-  Serial.print(F("Connecting to WiFi"));
+  // Read stored SSID and Password.
+  preferences.begin("wifi", true); // Open Preferences with read-only
+  String ssidString = preferences.getString("ssid", "");
+  String passwordString = preferences.getString("password", "");
+  preferences.end(); // Close Preferences
+  const char* ssid = ssidString.c_str();
+  const char* password = passwordString.c_str();
   //
-  while (WiFi.status() != WL_CONNECTED) {
-    // Check if the timeout has been reached
-    if (millis() - startMillis > timeout) {
-        connected = false;
-        break; // Exit the loop after timeout
+  if (ssid != "" && password != "") {
+    //
+    WiFi.begin(ssid, password);
+    Serial.print(F("Connecting to WiFi"));
+    //
+    while (WiFi.status() != WL_CONNECTED) {
+      // Check if the timeout has been reached
+      if (millis() - startMillis > timeout) {
+          connected = false;
+          break; // Exit the loop after timeout
+      }
+      delay(500);
+      Serial.print(F("."));
     }
-    delay(500);
-    Serial.print(F("."));
-  }
-  if (!connected) {
-    Serial.println(F("\nWiFi NOT connected!"));
-    Serial.println(F("Time starts at zero."));
-    Serial.println(F("Sea level pressure is default value of 1013.25 hPa."));
+    if (!connected) {
+      Serial.println(F("\nWiFi NOT connected!"));
+    } else {
+      Serial.println(F("\nWiFi connected."));
+      //
+      // Get time.
+      GetTime();
+      //
+      // Get sea level pressure.
+      GetSeaLevelPressure();
+      //
+      // Disconnect Wi-Fi
+      WiFi.disconnect(true);
+      WiFi.mode(WIFI_OFF);
+    }
   } else {
-    Serial.println(F("\nWiFi connected."));
-    //
-    // Get time.
-    GetTime();
-    //
-    // Get sea level pressure.
-    GetSeaLevelPressure();
-    //
-    // Disconnect Wi-Fi
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
+    Serial.println(F("No WiFi credentials stored!\n"));
   }
 }
 //
 //
 void GetTime(void) {
-  Serial.println(F("Getting time from NTP."));
   //configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1);
   configTzTime(time_zone, ntpServer1);
   if (!getLocalTime(&timeinfo)) {
       realTimeUpdate = false;
-      Serial.println(F("Failed to obtain time, so time starts at zero."));
   } else {
       realTimeUpdate = true;
-      Serial.println(F("Running on internal RTC."));
   }
   lastMillis = millis(); // Save the reference time
 }
 //
 //
-void GetSeaLevelPressure() {
+void GetSeaLevelPressure(void) {
   HTTPClient http;
   String url = "http://api.openweathermap.org/data/2.5/weather?lat=" + String(lat) + "&lon=" + String(lon) + "&appid=" + apiKey + "&units=metric";
   //
@@ -70,19 +78,16 @@ void GetSeaLevelPressure() {
     if (error) {
       Serial.print(F("JSON parsing failed: "));
       Serial.println(error.c_str());
+      http.end();
       return;
     }
     seaLevelPressureUpdate = true;
     //
     seaLevelPressure_hPa = doc["main"]["sea_level"] | doc["main"]["pressure"];
-    Serial.print(F("Sea Level Pressure: "));
-    Serial.print(seaLevelPressure_hPa);
-    Serial.println(F(" hPa"));
     //
   } else {
     Serial.print(F("Error in HTTP request: "));
     Serial.println(httpCode);
-    Serial.println(F("\nSea level pressure is default value of 1013.25 hPa."));
   }
   //
   http.end();
