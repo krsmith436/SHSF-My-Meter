@@ -1,6 +1,4 @@
 // for time information
-const char* ssid = "Be_My_Guest";
-const char* password = "MyArduinoNetwork";
 const char* ntpServer1 = "pool.ntp.org";
 const char* ntpServer2 = "time.nist.gov";
 const long gmtOffset_sec = -18000;  // Adjust for your timezone
@@ -38,6 +36,8 @@ const int8_t OLED_RESET = -1; // Reset pin # (or -1 if sharing Arduino reset pin
 const int16_t ROW_1 = 0;
 const int16_t ROW_2 = 12;
 const int16_t ROW_3 = 24;
+const int16_t COL_1 = 0;
+const int16_t COL_2 = 60;
 //
 // for communications
 const unsigned long COM_BAUD_RATE = 115200;

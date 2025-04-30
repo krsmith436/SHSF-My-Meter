@@ -1,14 +1,4 @@
-void SetupButtons(void) {
-  buttonA.previousMillis = 0;
-  buttonA.interval = 1500;
-  buttonB.previousMillis = 0;
-  buttonB.interval = 2000;
-  buttonC.previousMillis = 0;
-  buttonC.interval = 800;
-}
-//
-//
-void setupSensors() {
+void SetupSensors(void) {
   unsigned status;
   //
   // Initialize Battery Monitor.
@@ -26,12 +16,6 @@ void setupSensors() {
   }
   else {
     blnFoundBME280 = true;
-    /*
-    // default settings for BME280 senesor.
-    Serial.println("-- Default Test --");
-    Serial.println("normal mode, 16x oversampling for all, filter off,");
-    Serial.println("0.5ms standby period");
-    */
     // gaming settings for BME280 senesor.
     Serial.println(F("BME280 Sensor online, Gaming Scenario."));
     bme.setSampling(Adafruit_BME280::MODE_NORMAL,
@@ -56,10 +40,10 @@ void setupSensors() {
     blnFoundSI7021 = true;
     //
     Serial.print(F("Si7021 Sensor online"));
-    Serial.print(F(" Rev("));
-    Serial.print(si7021.getRevision());
-    Serial.print(F(")"));
-    Serial.print(F(" Serial #")); Serial.print(si7021.sernum_a, HEX); Serial.println(si7021.sernum_b, HEX);
+    // Serial.print(F(" Rev("));
+    // Serial.print(si7021.getRevision());
+    // Serial.print(F(")"));
+    // Serial.print(F(" Serial #")); Serial.print(si7021.sernum_a, HEX); Serial.println(si7021.sernum_b, HEX);
   }
   //
   // Initialize INA219 Current Sensor - Triggered Mode.

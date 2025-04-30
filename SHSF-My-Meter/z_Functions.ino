@@ -7,7 +7,7 @@ void DisplayValues(void) { // This is the main function.
       rgbLedWrite(RGB_BUILTIN, 0, RGB_LED_BRIGHTNESS, 0);  // Green
       timerRgbOnTime.once(RGB_ON_TIME, RgbLedOff);
       if (updateInterval_sec != INTERVAL_WEATHER){
-        changeUpdateInterval(INTERVAL_WEATHER); // value in seconds.
+        ChangeUpdateInterval(INTERVAL_WEATHER); // value in seconds.
       }
       ReadWeatherSensor();
       break;
@@ -15,7 +15,7 @@ void DisplayValues(void) { // This is the main function.
       rgbLedWrite(RGB_BUILTIN, RGB_LED_BRIGHTNESS, 0, 0);  // Red
       timerRgbOnTime.once(RGB_ON_TIME, RgbLedOff);
       if (updateInterval_sec != INTERVAL_BATTERY){
-        changeUpdateInterval(INTERVAL_BATTERY); // value in seconds.
+        ChangeUpdateInterval(INTERVAL_BATTERY); // value in seconds.
       }
       ReadBatteryMonitor();
       break;
@@ -23,7 +23,7 @@ void DisplayValues(void) { // This is the main function.
       rgbLedWrite(RGB_BUILTIN, 0, 0, RGB_LED_BRIGHTNESS);  // Blue
       timerRgbOnTime.once(RGB_ON_TIME, RgbLedOff);
       if ((updateInterval_sec != INTERVAL_SLOW_CURRENT) && (updateInterval_sec != INTERVAL_FAST_CURRENT)){
-        changeUpdateInterval(INTERVAL_SLOW_CURRENT); // value in seconds.
+        ChangeUpdateInterval(INTERVAL_SLOW_CURRENT); // value in seconds.
       }
       ReadCurrentSensor();
       break;
@@ -35,7 +35,7 @@ void DisplayValues(void) { // This is the main function.
 }
 //
 //
-void dsplyTime(void) {
+void DisplayTime(void) {
   time_t adjustedTime = 0;
   unsigned long elapsedMillis = millis() - lastMillis;
   //
@@ -47,13 +47,10 @@ void dsplyTime(void) {
   struct tm *updatedTime = localtime(&adjustedTime);
   //
   if (!realTimeUpdate) {
-    Serial.print(F("ZERO: "));
     display.print(F("ZERO: "));
   } else {
-    Serial.print(F("RTC: "));
     display.print(F("RTC: "));
   }
-  Serial.printf("%02d:%02d:%02d\n", updatedTime->tm_hour, updatedTime->tm_min, updatedTime->tm_sec);
   display.printf("%02d:%02d:%02d", updatedTime->tm_hour, updatedTime->tm_min, updatedTime->tm_sec);
 }
 //
@@ -62,38 +59,116 @@ void ReadWeatherSensor(void) {
   float si7021Temperature = 0;
   float si7021Humidity = 0;
   //
-  display.setCursor(0, ROW_3);
-  dsplyTime();
-  //
-  if (!blnFoundBME280) {
-    Serial.println(F("No BME280 Sensor Data!"));
-    //
-    display.setCursor(0, ROW_2); display.print(F("BME280 not found!"));
+  display.setCursor(COL_1, ROW_3);
+  if(!blnDisplaySeaLevelPressure) {
+    DisplayTime();
   } else {
-    Serial.print(F("BME280 Temperature = ")); Serial.print(bme.readTemperature()); Serial.println(F(" °C"));
-    Serial.print(F("BME280 Pressure = ")); Serial.print(bme.readPressure() / 100.0F); Serial.println(F(" hPa"));
-    Serial.print(F("BME280 Approx. Altitude = ")); Serial.print(bme.readAltitude(seaLevelPressure_hPa)); Serial.println(F(" m"));
-    Serial.println("***");
-    //
-    display.setCursor(0, ROW_2); display.print((seaLevelPressureUpdate) ? "" : "~");display.print((blnMetricUnit) ? bme.readAltitude(seaLevelPressure_hPa) : (bme.readAltitude(seaLevelPressure_hPa) * 3.28), 1); display.print((blnMetricUnit) ? " m" : " ft");
-    display.setCursor(65, ROW_2); display.print((blnMetricUnit) ? bme.readPressure() / 100.0F : (bme.readPressure() * 0.0002953F), 1); display.print((blnMetricUnit) ? " hPa" : " inHg");
+    display.print(F("SLP: ")); display.print((blnMetricUnit) ? seaLevelPressure_hPa : (seaLevelPressure_hPa * 0.02953F), 2); display.print((blnMetricUnit) ? " hPa" : " inHg");
   }
+  //
+  // if (!blnFoundBME280) {
+  //   Serial.println(F("No BME280 Sensor Data!"));
+  //   //
+  // } else {
+  //   Serial.print(F("BME280 Temperature = ")); Serial.print(bme.readTemperature()); Serial.println(F(" °C"));
+  //   Serial.print(F("BME280 Pressure = ")); Serial.print(bme.readPressure() / 100.0F); Serial.println(F(" hPa"));
+  //   Serial.print(F("BME280 Approx. Altitude = ")); Serial.print(bme.readAltitude(seaLevelPressure_hPa)); Serial.println(F(" m"));
+  //   Serial.println("***");
+  // }
+  display.setCursor(COL_2, ROW_1);
+  if (!blnFoundBME280) {
+    display.print(F("-----"));
+  } else {
+    display.print((seaLevelPressureUpdate) ? "" : "~"); display.print((blnMetricUnit) ? bme.readAltitude(seaLevelPressure_hPa) : (bme.readAltitude(seaLevelPressure_hPa) * 3.28), 0);
+  }
+  display.print((blnMetricUnit) ? " m" : " ft");
+  //
+  display.setCursor(COL_2, ROW_2);
+  if (!blnFoundBME280) {
+    display.print(F("-----"));
+  } else {
+    display.print((blnMetricUnit) ? bme.readPressure() / 100.0F : (bme.readPressure() * 0.0002953F), 2);
+  }
+  display.print((blnMetricUnit) ? " hPa" : " inHg");
+  //
   if (!blnFoundSI7021) {
-    Serial.println(F("No Si7021 Sensor Data!"));
+    // Serial.println(F("No Si7021 Sensor Data!"));
     //
-    display.setCursor(0, ROW_1); display.print(F("Si7021 not found!"));
   } else {
     si7021Temperature = si7021.readTemperature();
     si7021Humidity = si7021.readHumidity();
     //
-    Serial.print(F("Si7021 Temperature = ")); Serial.print((blnMetricUnit) ? si7021Temperature : ((si7021Temperature * 1.8F) + 32.0F), 1); Serial.println((blnMetricUnit) ? " C" : " F");
-    Serial.print(F("Si7021 Humidity = ")); Serial.print(si7021Humidity); Serial.println(F(" %"));
-    //
-    display.setCursor(0, ROW_1); display.print((blnMetricUnit) ? si7021Temperature : ((si7021Temperature * 1.8F) + 32.0F), 1); display.print((blnMetricUnit) ? " C" : " F");
-    display.setCursor(65, ROW_1); display.print(si7021Humidity, 1); display.print(F(" %"));
+    // Serial.print(F("Si7021 Temperature = ")); Serial.print((blnMetricUnit) ? si7021Temperature : ((si7021Temperature * 1.8F) + 32.0F), 1); Serial.println((blnMetricUnit) ? " C" : " F");
+    // Serial.print(F("Si7021 Humidity = ")); Serial.print(si7021Humidity); Serial.println(F(" %"));
   }
-  Serial.print(F("Update Interval = ")); Serial.print(updateInterval_sec, 3); Serial.println(F(" sec"));
+  display.setCursor(COL_1, ROW_1);
+  if (!blnFoundSI7021) {
+    display.print(F("-----"));
+  } else {
+    display.print((blnMetricUnit) ? si7021Temperature : ((si7021Temperature * 1.8F) + 32.0F), 1);
+  }
+  display.print((blnMetricUnit) ? " C" : " F");
+  //
+  display.setCursor(COL_1, ROW_2);
+  if (!blnFoundSI7021) {
+    display.print(F("-----"));
+  } else {
+  display.print(si7021Humidity, 1);
+  }
+  display.print(F(" %"));
+  //
   Serial.println();
+}
+//
+//
+void ReadCurrentSensor(void) {
+  float shuntVoltage_mV = 0.0;
+  float loadVoltage_V = 0.0;
+  float busVoltage_V = 0.0;
+  float current_mA = 0.0;
+  float power_mW = 0.0; 
+  bool ina219_overflow = false;
+  //
+  if (!blnFoundINA219) {
+    // Serial.println(F("No Current Sensor Data!"));
+    display.setCursor(COL_1, ROW_2); display.print(F("INA219 not found!"));
+  } else {
+    ina219.startSingleMeasurement(); // triggers single-shot measurement and waits until completed
+    shuntVoltage_mV = ina219.getShuntVoltage_mV();
+    busVoltage_V = ina219.getBusVoltage_V();
+    current_mA = ina219.getCurrent_mA();
+    if(abs(current_mA) > abs(currentHighValue_mA)) {
+      currentHighValue_mA = current_mA;
+    }
+    power_mW = ina219.getBusPower();
+    loadVoltage_V  = busVoltage_V - (shuntVoltage_mV/1000);
+    ina219_overflow = ina219.getOverflow();
+    //
+    // Serial.print(F("Shunt Voltage [mV]: ")); Serial.println(shuntVoltage_mV);
+    // Serial.print(F("Bus Voltage [V]: ")); Serial.println(busVoltage_V);
+    // Serial.print(F("Load Voltage [V]: ")); Serial.println(loadVoltage_V);
+    // Serial.print(F("Current[mA]: ")); Serial.println(current_mA);
+    // Serial.print(F("Max. Current[mA]: ")); Serial.println(currentHighValue_mA);
+    // Serial.print(F("Bus Power [mW]: ")); Serial.println(power_mW);
+    // Serial.print(F("Update [Sec]: ")); Serial.println(updateInterval_sec, 3);
+    //
+    if(!ina219_overflow){
+      Serial.println(F("Values OK - no overflow"));
+      display.invertDisplay(false);
+    }
+    else{
+      Serial.println(F("Overflow! Choose higher PGAIN"));
+      display.invertDisplay(true);
+    }
+    Serial.println();
+    //
+    // show data on OLED
+    display.setCursor(COL_1, ROW_1); display.print(busVoltage_V); display.print(" V");
+    display.setCursor(80, ROW_1); display.print("OK = "); display.print((!ina219_overflow)?"Yes":"NO");
+    display.setCursor(COL_1, ROW_2); display.print(current_mA); display.print(" mA");
+    display.setCursor(80, ROW_2); display.print(updateInterval_sec * 1000.0F, 0); display.print(" ms");
+    display.setCursor(COL_1, ROW_3); display.print(currentHighValue_mA); display.print(" max");
+  }
 }
 //
 //
@@ -109,68 +184,18 @@ void ReadBatteryMonitor(void) {
   if (maxlipo.isActiveAlert()) {
     uint8_t alert_status = maxlipo.getAlertStatus();
     HandleBatteryAlert(alert_status);
+    display.setCursor(COL_1, ROW_3); display.print(F("ALERT! flags = 0x")); display.print(alert_status, HEX);
   }
-  Serial.print(F("Batt Voltage: ")); Serial.print(cellVoltage, 3); Serial.println(F(" V"));
-  Serial.print(F("Batt Percent: ")); Serial.print(cellCharge, 1); Serial.println(F(" %"));
-  Serial.print(F("Batt ChgRate: ")); Serial.print(cellChargeRate, 1); Serial.println(F(" %/hr"));
-  Serial.print(F("Update Interval: ")); Serial.print(updateInterval_sec, 3); Serial.println(F(" sec"));
-  Serial.println();
+  // Serial.print(F("Batt Voltage: ")); Serial.print(cellVoltage, 3); Serial.println(F(" V"));
+  // Serial.print(F("Batt Percent: ")); Serial.print(cellCharge, 1); Serial.println(F(" %"));
+  // Serial.print(F("Batt ChgRate: ")); Serial.print(cellChargeRate, 1); Serial.println(F(" %/hr"));
+  // Serial.print(F("Update Interval: ")); Serial.print(updateInterval_sec, 3); Serial.println(F(" sec"));
+  // Serial.println();
   //
   //  show data on OLED
-  display.setCursor(0, ROW_1); display.print(F("   Batt: ")); display.print(cellVoltage, 2); display.print(F(" V"));
-  display.setCursor(0, ROW_2); display.print(F(" Charge: ")); display.print(cellCharge, 1); display.print(F(" %"));
-  display.setCursor(0, ROW_3); display.print(F("ChgRate: ")); display.print(cellChargeRate, 1); display.print(F(" %/hr"));
-}
-//
-//
-void ReadCurrentSensor(void) {
-  float shuntVoltage_mV = 0.0;
-  float loadVoltage_V = 0.0;
-  float busVoltage_V = 0.0;
-  float current_mA = 0.0;
-  float power_mW = 0.0; 
-  bool ina219_overflow = false;
-  //
-  if (!blnFoundINA219) {
-    Serial.println(F("No Current Sensor Data!"));
-    display.setCursor(0, ROW_2); display.print(F("INA219 not found!"));
-  } else {
-    ina219.startSingleMeasurement(); // triggers single-shot measurement and waits until completed
-    shuntVoltage_mV = ina219.getShuntVoltage_mV();
-    busVoltage_V = ina219.getBusVoltage_V();
-    current_mA = ina219.getCurrent_mA();
-    if(abs(current_mA) > abs(currentHighValue_mA)) {
-      currentHighValue_mA = current_mA;
-    }
-    power_mW = ina219.getBusPower();
-    loadVoltage_V  = busVoltage_V - (shuntVoltage_mV/1000);
-    ina219_overflow = ina219.getOverflow();
-    //
-    Serial.print(F("Shunt Voltage [mV]: ")); Serial.println(shuntVoltage_mV);
-    Serial.print(F("Bus Voltage [V]: ")); Serial.println(busVoltage_V);
-    Serial.print(F("Load Voltage [V]: ")); Serial.println(loadVoltage_V);
-    Serial.print(F("Current[mA]: ")); Serial.println(current_mA);
-    Serial.print(F("Max. Current[mA]: ")); Serial.println(currentHighValue_mA);
-    Serial.print(F("Bus Power [mW]: ")); Serial.println(power_mW);
-    Serial.print(F("Update [Sec]: ")); Serial.println(updateInterval_sec, 3);
-    //
-    if(!ina219_overflow){
-      Serial.println(F("Values OK - no overflow"));
-      display.invertDisplay(false);
-    }
-    else{
-      Serial.println(F("Overflow! Choose higher PGAIN"));
-      display.invertDisplay(true);
-    }
-    Serial.println();
-    //
-    // show data on OLED
-    display.setCursor(0, ROW_1); display.print(busVoltage_V); display.print(" V");
-    display.setCursor(80, ROW_1); display.print("OK = "); display.print((!ina219_overflow)?"Yes":"NO");
-    display.setCursor(0, ROW_2); display.print(current_mA); display.print(" mA");
-    display.setCursor(80, ROW_2); display.print(updateInterval_sec * 1000.0F, 0); display.print(" ms");
-    display.setCursor(0, ROW_3); display.print(currentHighValue_mA); display.print(" max");
-  }
+  display.setCursor(COL_1, ROW_1); display.print(F("Batt: ")); display.print(cellVoltage, 2); display.print(F(" V"));
+  display.setCursor(80, ROW_1); display.print(F("@ ")); display.print(cellCharge, 0); display.print(F(" %"));
+  display.setCursor(COL_1, ROW_2); display.print(F("ChgRate: ")); display.print(cellChargeRate, 1); display.print(F(" %/hr"));
 }
 // 
 //
@@ -206,7 +231,7 @@ void HandleBatteryAlert(uint8_t status_flags) {
 }
 //
 //
-void changeUpdateInterval(float newInterval) {
+void ChangeUpdateInterval(float newInterval) {
   timerRefreshDisplay.detach(); // Stop the current ticker
   updateInterval_sec = newInterval;
   timerRefreshDisplay.attach(updateInterval_sec, UpdateDisplay); // Reattach with new interval
@@ -219,7 +244,7 @@ void ToggleLogDataFlag(void) {
 }
 //
 //
-void gotTouch1(void) {touch1detected = true;}
+void GotTouch1(void) {touch1detected = true;}
 //
 //
 void RgbLedOff(void) {rgbLedWrite(RGB_BUILTIN, 0, 0, 0);}
