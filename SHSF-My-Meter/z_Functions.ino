@@ -1,8 +1,44 @@
+void AppendLogDataToFile(void) {
+  float si7021Temperature = 0;
+  //
+  File file = LittleFS.open(LOG_FILE, "a");
+  if (file) {
+    si7021Temperature = si7021.readTemperature();
+    GetFormattedTime(); // populate timeStr with current time.
+    file.println(String(timeStr) + "," + String(((si7021Temperature * 1.8F) + 32.0F), 1) + "," + String((bme.readAltitude(seaLevelPressure_hPa) * 3.28), 0));
+    file.close();
+  }
+}
+//
+//
+void GetFormattedTime(void) {
+  time_t adjustedTime = 0;
+  unsigned long elapsedMillis = millis() - lastMillis;
+  //
+  if (!realTimeUpdate) {
+    adjustedTime = (elapsedMillis / 1000); // Adjust using millis(), starting at zero.
+  } else {
+    adjustedTime = mktime(&timeinfo) + (elapsedMillis / 1000); // Adjust using millis(), starting at real time.
+  }
+  struct tm *updatedTime = localtime(&adjustedTime);
+  //
+  snprintf(timeStr, sizeof(timeStr),"%02d:%02d:%02d", updatedTime->tm_hour, updatedTime->tm_min, updatedTime->tm_sec);
+}
+//
+//
 void DisplayValues(void) { // This is the main function.
   //
   display.clearDisplay();
   //
   switch (dsplyMode) {
+    case WIFI:
+      rgbLedWrite(RGB_BUILTIN, 0, 0, RGB_LED_BRIGHTNESS);  // Blue
+      timerRgbOnTime.once(RGB_ON_TIME, RgbLedOff);
+      if (updateInterval_sec != INTERVAL_WEATHER){
+        ChangeUpdateInterval(INTERVAL_WEATHER); // use Weather value in seconds.
+      }
+      DisplayWiFi();
+      break;
     case WEATHER:
       rgbLedWrite(RGB_BUILTIN, 0, RGB_LED_BRIGHTNESS, 0);  // Green
       timerRgbOnTime.once(RGB_ON_TIME, RgbLedOff);
@@ -20,7 +56,7 @@ void DisplayValues(void) { // This is the main function.
       ReadBatteryMonitor();
       break;
     case CURRENT:
-      rgbLedWrite(RGB_BUILTIN, 0, 0, RGB_LED_BRIGHTNESS);  // Blue
+      rgbLedWrite(RGB_BUILTIN, RGB_LED_BRIGHTNESS, 0, RGB_LED_BRIGHTNESS);  // Magenta
       timerRgbOnTime.once(RGB_ON_TIME, RgbLedOff);
       if ((updateInterval_sec != INTERVAL_SLOW_CURRENT) && (updateInterval_sec != INTERVAL_FAST_CURRENT)){
         ChangeUpdateInterval(INTERVAL_SLOW_CURRENT); // value in seconds.
@@ -35,23 +71,21 @@ void DisplayValues(void) { // This is the main function.
 }
 //
 //
-void DisplayTime(void) {
-  time_t adjustedTime = 0;
-  unsigned long elapsedMillis = millis() - lastMillis;
+void DisplayWiFi(void) {
+  float percentUsed = (float)LittleFS.usedBytes() / LittleFS.totalBytes() * 100.0;
   //
-  if (!realTimeUpdate) {
-    adjustedTime = (elapsedMillis / 1000); // Adjust using millis(), starting at zero.
+  display.setCursor(COL_1, ROW_1); display.print(F("WiFi"));
+  display.setCursor(71, ROW_1); display.print(F("Log Usage"));
+  display.setCursor(COL_1, ROW_2); display.print(F("A-On B-Off"));
+  display.setCursor(90, ROW_2); display.printf("%3.0f %%\n", percentUsed);
+  display.setCursor(COL_1, ROW_3);
+  display.print(F("IP: "));
+  if (WiFi.status() == WL_CONNECTED) {
+    display.print(WiFi.localIP().toString());
+    display.invertDisplay(false);
   } else {
-    adjustedTime = mktime(&timeinfo) + (elapsedMillis / 1000); // Adjust using millis(), starting at real time.
+    display.print(F("Not Connected."));
   }
-  struct tm *updatedTime = localtime(&adjustedTime);
-  //
-  if (!realTimeUpdate) {
-    display.print(F("ZERO: "));
-  } else {
-    display.print(F("RTC: "));
-  }
-  display.printf("%02d:%02d:%02d", updatedTime->tm_hour, updatedTime->tm_min, updatedTime->tm_sec);
 }
 //
 //
@@ -59,9 +93,18 @@ void ReadWeatherSensor(void) {
   float si7021Temperature = 0;
   float si7021Humidity = 0;
   //
+  display.invertDisplay(false);
+  //
   display.setCursor(COL_1, ROW_3);
   if(!blnDisplaySeaLevelPressure) {
-    DisplayTime();
+    GetFormattedTime(); // populate timeStr with current time.
+    //
+    if (!realTimeUpdate) {
+      display.print(F("ZERO: "));
+    } else {
+      display.print(F("RTC: "));
+    }
+    display.print(timeStr);
   } else {
     display.print(F("SLP: ")); display.print((blnMetricUnit) ? seaLevelPressure_hPa : (seaLevelPressure_hPa * 0.02953F), 2); display.print((blnMetricUnit) ? " hPa" : " inHg");
   }
@@ -70,7 +113,7 @@ void ReadWeatherSensor(void) {
   //   Serial.println(F("No BME280 Sensor Data!"));
   //   //
   // } else {
-  //   Serial.print(F("BME280 Temperature = ")); Serial.print(bme.readTemperature()); Serial.println(F(" °C"));
+  //   Serial.print(F("\nBME280 Temperature = ")); Serial.print(bme.readTemperature()); Serial.println(F(" °C"));
   //   Serial.print(F("BME280 Pressure = ")); Serial.print(bme.readPressure() / 100.0F); Serial.println(F(" hPa"));
   //   Serial.print(F("BME280 Approx. Altitude = ")); Serial.print(bme.readAltitude(seaLevelPressure_hPa)); Serial.println(F(" m"));
   //   Serial.println("***");
@@ -117,7 +160,6 @@ void ReadWeatherSensor(void) {
   }
   display.print(F(" %"));
   //
-  Serial.println();
 }
 //
 //
@@ -144,7 +186,7 @@ void ReadCurrentSensor(void) {
     loadVoltage_V  = busVoltage_V - (shuntVoltage_mV/1000);
     ina219_overflow = ina219.getOverflow();
     //
-    // Serial.print(F("Shunt Voltage [mV]: ")); Serial.println(shuntVoltage_mV);
+    // Serial.print(F("\nShunt Voltage [mV]: ")); Serial.println(shuntVoltage_mV);
     // Serial.print(F("Bus Voltage [V]: ")); Serial.println(busVoltage_V);
     // Serial.print(F("Load Voltage [V]: ")); Serial.println(loadVoltage_V);
     // Serial.print(F("Current[mA]: ")); Serial.println(current_mA);
@@ -153,14 +195,13 @@ void ReadCurrentSensor(void) {
     // Serial.print(F("Update [Sec]: ")); Serial.println(updateInterval_sec, 3);
     //
     if(!ina219_overflow){
-      Serial.println(F("Values OK - no overflow"));
+      // Serial.println(F("Values OK - no overflow"));
       display.invertDisplay(false);
     }
     else{
-      Serial.println(F("Overflow! Choose higher PGAIN"));
+      // Serial.println(F("Overflow! Choose higher PGAIN"));
       display.invertDisplay(true);
     }
-    Serial.println();
     //
     // show data on OLED
     display.setCursor(COL_1, ROW_1); display.print(busVoltage_V); display.print(" V");
@@ -177,6 +218,8 @@ void ReadBatteryMonitor(void) {
   float cellCharge = maxlipo.cellPercent();
   float cellChargeRate = maxlipo.chargeRate();
   //
+  display.invertDisplay(false);
+  //
   if (isnan(cellVoltage)) {
     Serial.println("Failed to read cell voltage, check battery is connected!");
     return;
@@ -185,12 +228,13 @@ void ReadBatteryMonitor(void) {
     uint8_t alert_status = maxlipo.getAlertStatus();
     HandleBatteryAlert(alert_status);
     display.setCursor(COL_1, ROW_3); display.print(F("ALERT! flags = 0x")); display.print(alert_status, HEX);
+  } else {
+    display.setCursor(COL_1, ROW_3); display.print(F("No Alerts."));
   }
-  // Serial.print(F("Batt Voltage: ")); Serial.print(cellVoltage, 3); Serial.println(F(" V"));
+  // Serial.print(F("\nBatt Voltage: ")); Serial.print(cellVoltage, 3); Serial.println(F(" V"));
   // Serial.print(F("Batt Percent: ")); Serial.print(cellCharge, 1); Serial.println(F(" %"));
   // Serial.print(F("Batt ChgRate: ")); Serial.print(cellChargeRate, 1); Serial.println(F(" %/hr"));
   // Serial.print(F("Update Interval: ")); Serial.print(updateInterval_sec, 3); Serial.println(F(" sec"));
-  // Serial.println();
   //
   //  show data on OLED
   display.setCursor(COL_1, ROW_1); display.print(F("Batt: ")); display.print(cellVoltage, 2); display.print(F(" V"));
@@ -200,7 +244,7 @@ void ReadBatteryMonitor(void) {
 // 
 //
 void HandleBatteryAlert(uint8_t status_flags) {
-  Serial.print(F("ALERT! flags = 0x"));
+  Serial.print(F("\nALERT! flags = 0x"));
   Serial.println(status_flags, HEX);
   //
   if (status_flags & MAX1704X_ALERTFLAG_SOC_CHANGE) {
@@ -227,24 +271,33 @@ void HandleBatteryAlert(uint8_t status_flags) {
     Serial.print(F(", Reset Indicator"));
     maxlipo.clearAlertFlag(MAX1704X_ALERTFLAG_RESET_INDICATOR); // clear the alert
   }
-  Serial.println();
 }
 //
 //
 void ChangeUpdateInterval(float newInterval) {
   timerRefreshDisplay.detach(); // Stop the current ticker
   updateInterval_sec = newInterval;
-  timerRefreshDisplay.attach(updateInterval_sec, UpdateDisplay); // Reattach with new interval
+  timerRefreshDisplay.attach(updateInterval_sec, SetUpdateDisplayFlag); // Reattach with new interval
 }
 //
 //
 void ToggleLogDataFlag(void) {
   blnLogData = !blnLogData;
   digitalWrite(LED_PIN, blnLogData);
+  //
+  if (blnLogData) {
+    timerAppendLog.attach(INTERVAL_LOG, SetAppendDataToLogFlag);
+    SetAppendDataToLogFlag(); // first data log.
+  } else {
+    timerAppendLog.detach();
+  }
 }
 //
 //
-void GotTouch1(void) {touch1detected = true;}
+void SetAppendDataToLogFlag(void) {blnAppendDataToLog = true;}
+//
+//
+void GotTouch1(void) {blnTouch1detected = true;}
 //
 //
 void RgbLedOff(void) {rgbLedWrite(RGB_BUILTIN, 0, 0, 0);}
@@ -253,4 +306,4 @@ void RgbLedOff(void) {rgbLedWrite(RGB_BUILTIN, 0, 0, 0);}
 void LogoTimedOut(void) {blnLogoTimedOut = true;}
 //
 //
-void UpdateDisplay(void) {blnUpdateDisplay = true;}
+void SetUpdateDisplayFlag(void) {blnSetUpdateDisplayFlag = true;}
