@@ -1,3 +1,8 @@
+// for data logging
+const char* LOG_FILE = "/datalog.txt";
+const char LOG_HEADER[36] = "Time,Temperature(degF),Altitude(ft)"; // = 35 chars + 1 null terminator
+const float INTERVAL_LOG = 60; // value in seconds.
+//
 // for time information
 const char* ntpServer1 = "pool.ntp.org";
 const char* ntpServer2 = "time.nist.gov";
@@ -14,7 +19,8 @@ const char* lon = "-83.4751"; // Wolverine Lake, MI longitude
 const uint8_t WEATHER = 0;
 const uint8_t CURRENT = 1;
 const uint8_t BATTERY = 2;
-const uint8_t NUM_MODES = 2; // number of modes, starting at zero.
+const uint8_t WIFI = 3;
+const uint8_t NUM_MODES = 3; // number of modes minus one.
 //
 // for display interval, in Seconds
 const float INTERVAL_WEATHER = 2; // value in seconds.
@@ -25,6 +31,9 @@ const float INTERVAL_SLOW_CURRENT = 1; // value in seconds.
 // for RGB LED
 const float RGB_LED_BRIGHTNESS = 25;
 const float RGB_ON_TIME = 0.03; // value in seconds.
+//
+// for Red LED
+const float RED_OFF_TIME = 0.05; // value in seconds.
 //
 // for Touch switch
 const int THRESHOLD = 1500;  // ESP32S2

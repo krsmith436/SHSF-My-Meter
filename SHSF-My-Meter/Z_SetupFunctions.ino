@@ -1,3 +1,23 @@
+bool SetupLittleFS(void) {
+  if (!LittleFS.begin(true)) {
+    Serial.println("LittleFS Mount Failed.");
+    return false;
+  }
+  // Ensure log file exists
+  if (!LittleFS.exists(LOG_FILE)) {
+    File file = LittleFS.open(LOG_FILE, "w");
+    if (file) {
+      file.println(LOG_HEADER);
+      file.close();
+    } else {
+      return false;
+    }
+  }
+  Serial.println("LittleFS online.");
+  return true;
+}
+//
+//
 void SetupSensors(void) {
   unsigned status;
   //
@@ -39,7 +59,7 @@ void SetupSensors(void) {
   } else {
     blnFoundSI7021 = true;
     //
-    Serial.print(F("Si7021 Sensor online"));
+    Serial.println(F("Si7021 Sensor online."));
     // Serial.print(F(" Rev("));
     // Serial.print(si7021.getRevision());
     // Serial.print(F(")"));

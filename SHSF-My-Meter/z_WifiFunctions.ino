@@ -1,49 +1,15 @@
 void GetWifiData(void) {
   // 1) Get time from Network Time Protocol (NTP) server.
   // 2) Get sea level pressure from OpenWeatherMap API.
-  unsigned long timeout = 5000; // timeout in milliseconds.
-  unsigned long startMillis = millis(); // start time for timeout.
-  bool connected = true;
-  //
-  // Read stored SSID and Password.
-  preferences.begin("wifi", true); // Open Preferences with read-only
-  String ssidString = preferences.getString("ssid", "");
-  String passwordString = preferences.getString("password", "");
-  preferences.end(); // Close Preferences
-  const char* ssid = ssidString.c_str();
-  const char* password = passwordString.c_str();
-  //
-  if (ssid != "" && password != "") {
-    //
-    WiFi.begin(ssid, password);
-    Serial.print(F("Connecting to WiFi"));
-    //
-    while (WiFi.status() != WL_CONNECTED) {
-      // Check if the timeout has been reached
-      if (millis() - startMillis > timeout) {
-          connected = false;
-          break; // Exit the loop after timeout
-      }
-      delay(500);
-      Serial.print(F("."));
-    }
-    if (!connected) {
-      Serial.println(F("\nWiFi NOT connected!"));
-    } else {
-      Serial.println(F("\nWiFi connected."));
-      //
-      // Get time.
-      GetTime();
-      //
-      // Get sea level pressure.
-      GetSeaLevelPressure();
-      //
-      // Disconnect Wi-Fi
-      WiFi.disconnect(true);
-      WiFi.mode(WIFI_OFF);
-    }
+  // Connect Wi-Fi
+  if (!ConnectToWiFi()) {
+    Serial.println(F("\nWiFi NOT connected!"));
   } else {
-    Serial.println(F("No WiFi credentials stored!\n"));
+    GetTime();
+    GetSeaLevelPressure();
+    //
+    // Disconnect Wi-Fi
+    DisconnectFromWiFi();
   }
 }
 //
@@ -69,7 +35,7 @@ void GetSeaLevelPressure(void) {
   //
   if (httpCode > 0) {
     String payload = http.getString();
-    Serial.println(F("Weather JSON received:"));
+    Serial.println(F("Weather JSON received."));
     //
     // Parse JSON
     DynamicJsonDocument doc(2048);
@@ -91,4 +57,81 @@ void GetSeaLevelPressure(void) {
   }
   //
   http.end();
+}
+//
+//
+void handleRoot() {
+  String html = "<h2>ESP32 Log Server</h2>"
+                "<a href='/view'>View Log</a><br>"
+                "<a href='/download'>Download Log</a><br>"
+                "<a href='/clear'>Clear Log</a><br>";
+  server.send(200, "text/html", html);
+}
+//
+//
+void handleView() {
+  File file = LittleFS.open(LOG_FILE, "r");
+  if (!file) {
+    server.send(500, "text/plain", "Failed to open log file");
+    return;
+  }
+  //
+  String content;
+  while (file.available()) {
+    content += file.readStringUntil('\n') + "<br>";
+  }
+  file.close();
+  server.send(200, "text/html", "<h3>Log Contents:</h3>" + content);
+}
+//
+//
+void handleDownload() {
+  File file = LittleFS.open(LOG_FILE, "r");
+  if (!file) {
+    server.send(500, "text/plain", "File not found");
+    return;
+  }
+  //
+  server.streamFile(file, "text/plain");
+  file.close();
+}
+//
+//
+void handleClear() {
+  LittleFS.remove(LOG_FILE);
+  File file = LittleFS.open(LOG_FILE, "w");
+  if (file) {
+    file.println(LOG_HEADER);
+    file.close();
+  }
+  server.send(200, "text/html", "Log cleared. <a href='/'>Go back</a>");
+}
+//
+//
+void DisconnectFromWiFi(void) {
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+}
+//
+//
+bool ConnectToWiFi(void) {
+  // Read stored SSID and Password.
+  preferences.begin("wifi", true); // Open Preferences with read-only
+  String ssid = preferences.getString("ssid", "");
+  String password = preferences.getString("password", "");
+  preferences.end(); // Close Preferences
+  //
+  if (ssid.isEmpty() || password.isEmpty()) return false;
+  //
+  WiFi.begin(ssid.c_str(), password.c_str());
+  Serial.print("Connecting to WiFi");
+  for (int i = 0; i < 20; i++) {
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("\nWiFi connected, IP: " + WiFi.localIP().toString());
+      return true;
+    }
+    delay(500);
+    Serial.print(".");
+  }
+  return false;
 }

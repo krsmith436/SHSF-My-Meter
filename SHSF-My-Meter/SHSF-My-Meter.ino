@@ -29,8 +29,10 @@
 #include <INA219_WE.h> // for INA219 Current Sensor.
 #include <Ticker.h> // for Ticker callbacks, which can call a function in a predetermined interval.
 #include <Preferences.h> // wrapper for EEPROM library used to store WiFi ssid and password.
-#include <WiFi.h> // for Wireless Fidelity (WiFi).
+#include <WiFi.h> // to connect to your Wireless Fidelity (WiFi) network.
 #include <HTTPClient.h> // for Sea Level Pressure.
+#include <WebServer.h> //(ESP32 built-in) to create a lightweight HTTP server
+#include <LittleFS.h> // to serve and manage the log file.
 #include <ArduinoJson.h> // for Sea Level Pressure.
 #include "time.h"
 #include "SHSF-My-Meter.h"
@@ -42,16 +44,18 @@ Adafruit_BME280 bme; // I2C
 Adafruit_Si7021 si7021 = Adafruit_Si7021();
 INA219_WE ina219 = INA219_WE(INA219_I2C_ADDR);
 Preferences preferences;
+WebServer server(80);
 //
 //--------------------GLOBAL VARIABLES----------------------//
 struct button buttonA = {0, 1500};
 struct button buttonB = {0, 2000};
 struct button buttonC = {0, 800};
 bool blnLogoTimedOut = false; // flag to indicate the logo has timed out.
-bool blnUpdateDisplay = false; // flag to update the display values.
+bool blnSetUpdateDisplayFlag = false; // flag to update the display values.
 bool blnMetricUnit = false; // flag to indicate metric units for display.
 bool blnDisplaySeaLevelPressure = false; // flag to display sea level pressure.
-bool blnLogData = false; // flag to indicate data is beinf logged.
+bool blnLogData = false; // flag to indicate data is being logged.
+bool blnAppendDataToLog = false; // flag to indicate data is to be written (appended) to log file.
 uint8_t dsplyMode = 0; // integer to indicate the display mode.
 float updateInterval_sec = INTERVAL_WEATHER; // value in seconds to update the display values.
 float currentHighValue_mA = 0.0; // value for INA219 Current Sensor.
@@ -60,18 +64,21 @@ bool blnFoundOLED = false; // flag for result of begin statement of sensor.
 bool blnFoundBME280 = false; // flag for result of begin statement of sensor.
 bool blnFoundSI7021 = false; // flag for result of begin statement of sensor.
 bool blnFoundINA219 = false; // flag for result of begin statement of sensor.
-bool touch1detected = false; // flag for Touch switch 1 detection.
+bool blnTouch1detected = false; // flag for Touch switch 1 detection.
+bool blnFoundLittleFS = false; // flag for result of begin statement of file system.
 //
 struct tm timeinfo;
 bool realTimeUpdate = false;
 bool seaLevelPressureUpdate = false;
 unsigned long lastMillis;
+char timeStr[9]; // "HH:MM:SS" = 8 chars + 1 null terminator
 //
 //-------------------------Ticker---------------------------//
 Ticker timerLogo;
 Ticker timerRefreshDisplay;
 Ticker timerRgbOnTime;
 Ticker timerTouchHold;
+Ticker timerAppendLog;
 //
 void setup() {
   unsigned long timeout = 5000; // Serial() timeout in milliseconds.
@@ -79,7 +86,7 @@ void setup() {
   //
   // Initialze Ticker
   timerLogo.once(4, LogoTimedOut); // Run only once.
-  timerRefreshDisplay.attach(2, UpdateDisplay);
+  timerRefreshDisplay.attach(2, SetUpdateDisplayFlag);
   //
   // Initialize OLED display.
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally.
@@ -109,17 +116,19 @@ void setup() {
   Serial.println(F("Starting setup."));
   if (!blnFoundOLED) {
     Serial.println(F("SSD1306 display allocation failed"));
-  }
-  else {
+  } else {
     Serial.println(F("OLED Display Module online."));
+  }
+  //
+  // Setup log file
+  if (!SetupLittleFS()) {
+    blnFoundLittleFS = false;
+  } else {
+    blnFoundLittleFS = true;
   }
   //
   // Setup sensors
   SetupSensors();
-  //
-  // Initialze Ticker
-  timerLogo.once(4, LogoTimedOut); // Run only once.
-  timerRefreshDisplay.attach(2, UpdateDisplay);
   //
   // Setup buttons
   pinMode(BUTTON_A, INPUT_PULLUP);
@@ -136,14 +145,23 @@ void setup() {
   // Setup time and Sea Level Pressure
   GetWifiData();
   //
+  // Web server routes
+  server.on("/", handleRoot);
+  server.on("/view", handleView);
+  server.on("/download", handleDownload);
+  server.on("/clear", handleClear);
+  server.begin();
+  //
   Serial.println(F("Setup is complete.\n"));
 }
 
 void loop() {
   if(blnLogoTimedOut) {
     //
-    if (touch1detected) {
-      touch1detected = false;
+    server.handleClient(); // Web server.
+    //
+    if (blnTouch1detected) {
+      blnTouch1detected = false;
       if (touchInterruptGetLastStatus(TOUCH_1)) {
         timerTouchHold.once(2, ToggleLogDataFlag);
       } else {
@@ -160,6 +178,11 @@ void loop() {
           case CURRENT:
             currentHighValue_mA = 0;
             break;
+          case WIFI:
+            display.invertDisplay(true);
+            display.display();
+            if (WiFi.status() != WL_CONNECTED) {ConnectToWiFi();}
+            break;
         }
         //
         DisplayValues();
@@ -174,11 +197,14 @@ void loop() {
             blnDisplaySeaLevelPressure = !blnDisplaySeaLevelPressure;
             break;
           case CURRENT:
-          if (updateInterval_sec == INTERVAL_SLOW_CURRENT) {
-            ChangeUpdateInterval(INTERVAL_FAST_CURRENT); // value in seconds.
-          } else {
-            ChangeUpdateInterval(INTERVAL_SLOW_CURRENT); // value in seconds.
-          }
+            if (updateInterval_sec == INTERVAL_SLOW_CURRENT) {
+              ChangeUpdateInterval(INTERVAL_FAST_CURRENT); // value in seconds.
+            } else {
+              ChangeUpdateInterval(INTERVAL_SLOW_CURRENT); // value in seconds.
+            }
+            break;
+          case WIFI:
+            if (WiFi.status() == WL_CONNECTED) {DisconnectFromWiFi();}
             break;
         }
         //
@@ -197,9 +223,14 @@ void loop() {
       }
     }
     //
-    if (blnUpdateDisplay) {
+    if (blnSetUpdateDisplayFlag) {
+      blnSetUpdateDisplayFlag = false;
       DisplayValues();
-      blnUpdateDisplay = false;
+    }
+    //
+    if (blnAppendDataToLog) {
+      blnAppendDataToLog = false;
+      AppendLogDataToFile();
     }
     //
     yield(); // allow other processes to run.
