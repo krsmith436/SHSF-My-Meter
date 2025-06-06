@@ -60,12 +60,44 @@ void GetSeaLevelPressure(void) {
 }
 //
 //
-void handleRoot() {
-  String html = "<h2>ESP32 Log Server</h2>"
-                "<a href='/view'>View Log</a><br>"
-                "<a href='/download'>Download Log</a><br>"
-                "<a href='/clear'>Clear Log</a><br>";
+void handleLogRoot() {
+  String html = "<h1><font color=green>Smith Huotari &amp; Santa Fe</font><br>"
+                "<font color=orange>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;My Meter</font></h1>"
+                "<h1>Log File</h1>"
+                "<ul type=circle>"
+                "<li><b><a href='/view'>View</a></b></li>"
+                "<li><b><a href='/download'>Download</a></b></li>"
+                "<li><b><a href='/clear'>Clear</a></b></li>"
+                "</ul>";
   server.send(200, "text/html", html);
+}
+//
+//
+void handleCredentialsRoot() {
+  String html = "<h1><font color=green>Smith Huotari &amp; Santa Fe</font><br>"
+                "<font color=orange>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;My Meter</font></h1>"
+                "<h1>WiFi Credentials</h1>"
+                "<form action='/save' method='POST'>"
+                "<b>SSID:</b><input name='ssid'><br>"
+                "<b>Password:</b><input name='password' type='password'><br>"
+                "<input type='submit'></form>";
+  server.send(200, "text/html", html);
+}
+//
+//
+void handleSwitch() {
+  currentPage = (currentPage == PAGE_CREDENTIALS) ? PAGE_LOG : PAGE_CREDENTIALS;
+  server.sendHeader("Location", "/", true);  // redirect to root
+  server.send(302, "text/plain", "");
+}
+//
+//
+void handleDynamicRoot() {
+  if (currentPage == PAGE_LOG) {
+    handleLogRoot(); // Log file form.
+  } else {
+    handleCredentialsRoot(); // WiFi credentials form.
+  }
 }
 //
 //
@@ -108,12 +140,42 @@ void handleClear() {
 }
 //
 //
-void DisconnectFromWiFi(void) {
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
+void handleSave() {
+  String ssid = server.arg("ssid");
+  String password = server.arg("password");
+  //
+  preferences.begin("wifi", false);
+  preferences.putString("ssid", ssid);
+  preferences.putString("password", password);
+  preferences.end();
+  //
+  server.send(200, "text/html", "Saved! Rebooting...");
+  delay(2000);
+  ESP.restart();
 }
 //
+// ======= Catch-all redirect =======
+void handleRedirect() {
+  server.sendHeader("Location", String("http://") + WiFi.softAPIP().toString(), true);
+  server.send(302, "text/plain", "");
+}
 //
+// ======= Set up AP + DNS + Web server =======
+void setupAP() {
+  //
+  handleSwitch(); // Switch to Credentials form.
+  //
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(apSSID);
+  IPAddress IP = WiFi.softAPIP();
+  Serial.print(F("Access Point IP: "));
+  Serial.println(IP);
+  //
+  // DNS redirects all queries to ESP IP (captive portal trick)
+  dns.start(DNS_PORT, "*", IP);
+}
+//
+// ======= Try to connect to saved Wi-Fi =======
 bool ConnectToWiFi(void) {
   // Read stored SSID and Password.
   preferences.begin("wifi", true); // Open Preferences with read-only
@@ -131,7 +193,13 @@ bool ConnectToWiFi(void) {
       return true;
     }
     delay(500);
-    Serial.print(".");
+    Serial.print(F("."));
   }
   return false;
+}
+//
+//
+void DisconnectFromWiFi(void) {
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
 }

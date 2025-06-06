@@ -32,6 +32,7 @@
 #include <WiFi.h> // to connect to your Wireless Fidelity (WiFi) network.
 #include <HTTPClient.h> // for Sea Level Pressure.
 #include <WebServer.h> //(ESP32 built-in) to create a lightweight HTTP server
+#include <DNSServer.h>
 #include <LittleFS.h> // to serve and manage the log file.
 #include <ArduinoJson.h> // for Sea Level Pressure.
 #include "time.h"
@@ -45,6 +46,7 @@ Adafruit_Si7021 si7021 = Adafruit_Si7021();
 INA219_WE ina219 = INA219_WE(INA219_I2C_ADDR);
 Preferences preferences;
 WebServer server(80);
+DNSServer dns;
 //
 //--------------------GLOBAL VARIABLES----------------------//
 struct button buttonA = {0, 1500};
@@ -72,6 +74,8 @@ bool realTimeUpdate = false;
 bool seaLevelPressureUpdate = false;
 unsigned long lastMillis;
 char timeStr[9]; // "HH:MM:SS" = 8 chars + 1 null terminator
+//
+PageMode currentPage = PAGE_LOG; // For HTTP root page selection.
 //
 //-------------------------Ticker---------------------------//
 Ticker timerLogo;
@@ -146,10 +150,14 @@ void setup() {
   GetWifiData();
   //
   // Web server routes
-  server.on("/", handleRoot);
-  server.on("/view", handleView);
-  server.on("/download", handleDownload);
-  server.on("/clear", handleClear);
+  server.on("/", handleDynamicRoot);
+  server.on("/view", handleView); // View log file.
+  server.on("/download", handleDownload); // Download log file.
+  server.on("/clear", handleClear); // Clear log file.
+  server.on("/save", HTTP_POST, handleSave); // Save WiFi credentials.
+  //
+  // Catch captive portal triggers and unknown paths
+  server.onNotFound(handleRedirect);
   server.begin();
   //
   Serial.println(F("Setup is complete.\n"));
@@ -158,12 +166,13 @@ void setup() {
 void loop() {
   if(blnLogoTimedOut) {
     //
-    server.handleClient(); // Web server.
+    dns.processNextRequest(); // DNS server.
+    server.handleClient(); // HTTP server.
     //
-    if (blnTouch1detected) {
+    if (blnTouch1detected) { // This changes on a change of state.
       blnTouch1detected = false;
       if (touchInterruptGetLastStatus(TOUCH_1)) {
-        timerTouchHold.once(2, ToggleLogDataFlag);
+        timerTouchHold.once(2, ToggleLogDataFlag); // Start or Stop logging data after 2 seconds of pressing button.
       } else {
         timerTouchHold.detach();
       }
@@ -181,7 +190,12 @@ void loop() {
           case WIFI:
             display.invertDisplay(true);
             display.display();
-            if (WiFi.status() != WL_CONNECTED) {ConnectToWiFi();}
+            if (WiFi.status() != WL_CONNECTED) {
+              if (!ConnectToWiFi()) {
+                Serial.println(F("\nStarting config portal..."));
+                setupAP();
+              }
+            }
             break;
         }
         //

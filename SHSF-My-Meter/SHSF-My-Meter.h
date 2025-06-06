@@ -10,6 +10,10 @@ const long gmtOffset_sec = -18000;  // Adjust for your timezone
 const int daylightOffset_sec = 3600;
 const char* time_zone = "EST5EDT,M3.2.0,M11.1.0";  // TimeZone rule for America_Detroit.
 //
+// DNS Server
+const byte DNS_PORT = 53;
+const char *apSSID = "SHSF_MyMeter_Setup";
+//
 // for OpenWeatherMap
 const char* apiKey = "17c1605d232037456e84471f772b3e3a"; // OpenWeatherMap API key "esp32-my-meter".
 const char* lat = "42.5610";  // Wolverine Lake, MI latitude
@@ -50,6 +54,12 @@ const int16_t COL_2 = 60;
 //
 // for communications
 const unsigned long COM_BAUD_RATE = 115200;
+//
+// for HTTP server
+enum PageMode {
+  PAGE_CREDENTIALS,
+  PAGE_LOG
+};
 //
 struct button {
   unsigned long previousMillis; // time since last button press.
