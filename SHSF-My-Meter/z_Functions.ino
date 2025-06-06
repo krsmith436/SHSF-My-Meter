@@ -11,6 +11,23 @@ void AppendLogDataToFile(void) {
 }
 //
 //
+void SetAppendSessionNumToLogFIle(void) {
+  uint16_t session = 0;
+  //
+  preferences.begin("log", false);
+  session = preferences.getUShort("session", 0) + 1; // Read value from NVS, 0 if not found, and add one.
+  preferences.putUShort("session", session);
+  preferences.end();
+  //
+  File file = LittleFS.open(LOG_FILE, "a");
+  if (file) {
+    file.println("00:00:00,Session," + String(session));
+    file.close();
+  }
+}
+//
+// This function populates the global variable 'timeStr' with current time.
+// Call this function and then use 'timeStr' afterward.
 void GetFormattedTime(void) {
   time_t adjustedTime = 0;
   unsigned long elapsedMillis = millis() - lastMillis;
@@ -287,7 +304,8 @@ void ToggleLogDataFlag(void) {
   //
   if (blnLogData) {
     timerAppendLog.attach(INTERVAL_LOG, SetAppendDataToLogFlag);
-    SetAppendDataToLogFlag(); // first data log.
+    SetAppendSessionNumToLogFIle(); // Add line to indicate a new session.
+    SetAppendDataToLogFlag(); // First data log.
   } else {
     timerAppendLog.detach();
   }
