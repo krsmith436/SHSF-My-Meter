@@ -24,7 +24,8 @@ const uint8_t WEATHER = 0;
 const uint8_t CURRENT = 1;
 const uint8_t BATTERY = 2;
 const uint8_t WIFI = 3;
-const uint8_t NUM_MODES = 3; // number of modes minus one.
+const uint8_t LOG = 4;
+const uint8_t NUM_MODES = 4; // number of modes minus one.
 //
 // for display interval, in Seconds
 const float INTERVAL_WEATHER = 2; // value in seconds.

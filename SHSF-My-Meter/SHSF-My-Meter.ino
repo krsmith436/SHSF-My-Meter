@@ -51,13 +51,14 @@ DNSServer dns;
 //--------------------GLOBAL VARIABLES----------------------//
 struct button buttonA = {0, 1500};
 struct button buttonB = {0, 2000};
-struct button buttonC = {0, 800};
+struct button buttonC = {0, 500};
 bool blnLogoTimedOut = false; // flag to indicate the logo has timed out.
 bool blnSetUpdateDisplayFlag = false; // flag to update the display values.
 bool blnMetricUnit = false; // flag to indicate metric units for display.
 bool blnDisplaySeaLevelPressure = false; // flag to display sea level pressure.
 bool blnLogData = false; // flag to indicate data is being logged.
 bool blnAppendDataToLog = false; // flag to indicate data is to be written (appended) to log file.
+uint16_t session = 0; // number of the log file session.
 uint8_t dsplyMode = 0; // integer to indicate the display mode.
 float updateInterval_sec = INTERVAL_WEATHER; // value in seconds to update the display values.
 float currentHighValue_mA = 0.0; // value for INA219 Current Sensor.
@@ -130,7 +131,11 @@ void setup() {
   } else {
     blnFoundLittleFS = true;
   }
-  //
+  //  Get value from NVS.
+  preferences.begin("log", true);
+  session = preferences.getUShort("session", 0); // Set to zero if not found in NVS.
+  preferences.end();
+//
   // Setup sensors
   SetupSensors();
   //
