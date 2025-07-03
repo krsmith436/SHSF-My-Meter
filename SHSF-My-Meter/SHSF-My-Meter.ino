@@ -54,11 +54,13 @@ struct button buttonB = {0, 2000};
 struct button buttonC = {0, 500};
 bool blnLogoTimedOut = false; // flag to indicate the logo has timed out.
 bool blnSetUpdateDisplayFlag = false; // flag to update the display values.
-bool blnMetricUnit = false; // flag to indicate metric units for display.
-bool blnDisplaySeaLevelPressure = false; // flag to display sea level pressure.
+bool blnMetricUnit = false; // flag to indicate metric units for display, else imperial units.
+bool blnDisplaySeaLevelPressure = false; // flag to display sea level pressure, else Real Time Clock (RTC).
+bool blnDisplayRtcDate = false; // flag to display Real Time Clock (RTC) date, else sessionDate.
 bool blnLogData = false; // flag to indicate data is being logged.
 bool blnAppendDataToLog = false; // flag to indicate data is to be written (appended) to log file.
 uint16_t session = 0; // number of the log file session.
+char sessionDate[11]; // date (yyyy-mm-dd) of the log file session.
 uint8_t dsplyMode = 0; // integer to indicate the display mode.
 float updateInterval_sec = INTERVAL_WEATHER; // value in seconds to update the display values.
 float currentHighValue_mA = 0.0; // value for INA219 Current Sensor.
@@ -74,7 +76,6 @@ struct tm timeinfo;
 bool realTimeUpdate = false;
 bool seaLevelPressureUpdate = false;
 unsigned long lastMillis;
-char timeStr[9]; // "HH:MM:SS" = 8 chars + 1 null terminator
 //
 PageMode currentPage = PAGE_LOG; // For HTTP root page selection.
 //
@@ -131,11 +132,13 @@ void setup() {
   } else {
     blnFoundLittleFS = true;
   }
-  //  Get value from NVS.
+  //  Get session number and date from NVS.
   preferences.begin("log", true);
   session = preferences.getUShort("session", 0); // Set to zero if not found in NVS.
+  String stored = preferences.getString("sessionDate", "");
   preferences.end();
-//
+  stored.toCharArray(sessionDate, sizeof(sessionDate)); // Copy safely into sessionDate.
+  //
   // Setup sensors
   SetupSensors();
   //
@@ -202,6 +205,9 @@ void loop() {
               }
             }
             break;
+          case LOG:
+            blnDisplayRtcDate = !blnDisplayRtcDate;
+            break;
         }
         //
         DisplayValues();
@@ -225,7 +231,7 @@ void loop() {
           case WIFI:
             if (WiFi.status() == WL_CONNECTED) {DisconnectFromWiFi();}
             break;
-        }
+        } //
         //
         DisplayValues();
         //

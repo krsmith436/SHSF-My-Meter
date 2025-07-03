@@ -1,34 +1,40 @@
 void AppendLogDataToFile(void) {
   float si7021Temperature = 0;
+  char timeStr[9];
   //
   File file = LittleFS.open(LOG_FILE, "a");
   if (file) {
     si7021Temperature = si7021.readTemperature();
-    GetFormattedTime(); // populate timeStr with current time.
+    GetTimeOrDateString(timeStr, true); // set timeStr to current time.
     file.println(String(timeStr) + "," + String(((si7021Temperature * 1.8F) + 32.0F), 1) + "," + String((bme.readAltitude(seaLevelPressure_hPa) * 3.28), 0));
     file.close();
   }
 }
 //
 //
-void SetAppendSessionNumToLogFIle(void) {
-  uint16_t session = 0;
+void AppendSessionInfoToLogFIle(void) {
   //
+  session = session + 1; // Add 1 to session number.
+  GetTimeOrDateString(sessionDate, false); // set sessionDate to current date.
   preferences.begin("log", false);
-  session = preferences.getUShort("session", 0) + 1; // Read value from NVS, 0 if not found, and add one.
   preferences.putUShort("session", session);
+  preferences.putString("sessionDate", String(sessionDate));
   preferences.end();
   //
   File file = LittleFS.open(LOG_FILE, "a");
   if (file) {
-    file.println("00:00:00,Session," + String(session));
+    file.println("00:00:00," + String(sessionDate) + ",Session-" + String(session));
     file.close();
   }
 }
 //
-// This function populates the global variable 'timeStr' with current time.
-// Call this function and then use 'timeStr' afterward.
-void GetFormattedTime(void) {
+//
+void GetTimeOrDateString(char *outputStr, bool blnOutputTime) {
+// outputStr[SIZE]:
+// ----------------------------------------------------------------------
+// TIME[9]: "HH:MM:SS" = 8 chars + 1 null terminator
+// DATE[11]: "YYYY-MM-DD" = 10 characters for date plus 1 NULL character.
+// ----------------------------------------------------------------------
   time_t adjustedTime = 0;
   unsigned long elapsedMillis = millis() - lastMillis;
   //
@@ -38,8 +44,21 @@ void GetFormattedTime(void) {
     adjustedTime = mktime(&timeinfo) + (elapsedMillis / 1000); // Adjust using millis(), starting at real time.
   }
   struct tm *updatedTime = localtime(&adjustedTime);
+  // struct tm fields:
+  // tm_year: years since 1900
+  // tm_mon: months since January [0-11]
+  // tm_mday: day of the month [1-31]
+  // tm_hour, tm_min, tm_sec also available
   //
-  snprintf(timeStr, sizeof(timeStr),"%02d:%02d:%02d", updatedTime->tm_hour, updatedTime->tm_min, updatedTime->tm_sec);
+  int year  = updatedTime->tm_year + 1900;
+  int month = updatedTime->tm_mon + 1;
+  int day   = updatedTime->tm_mday;
+  //
+  if (!blnOutputTime) {
+    snprintf(outputStr, 11, "%04d-%02d-%02d", year, month, day);
+  } else {
+    snprintf(outputStr, 9, "%02d:%02d:%02d", updatedTime->tm_hour, updatedTime->tm_min, updatedTime->tm_sec);
+  }
 }
 //
 //
@@ -48,6 +67,14 @@ void DisplayValues(void) { // This is the main function.
   display.clearDisplay();
   //
   switch (dsplyMode) {
+    case LOG:
+      rgbLedWrite(RGB_BUILTIN, RGB_LED_BRIGHTNESS, RGB_LED_BRIGHTNESS, 0);  // Yellow
+      timerRgbOnTime.once(RGB_ON_TIME, RgbLedOff);
+      if (updateInterval_sec != INTERVAL_WEATHER){
+        ChangeUpdateInterval(INTERVAL_WEATHER); // use Weather value in seconds.
+      }
+      DisplayLogFile();
+      break;
     case WIFI:
       rgbLedWrite(RGB_BUILTIN, 0, 0, RGB_LED_BRIGHTNESS);  // Blue
       timerRgbOnTime.once(RGB_ON_TIME, RgbLedOff);
@@ -88,13 +115,29 @@ void DisplayValues(void) { // This is the main function.
 }
 //
 //
-void DisplayWiFi(void) {
+void DisplayLogFile(void) {
   float percentUsed = (float)LittleFS.usedBytes() / LittleFS.totalBytes() * 100.0;
+  size_t used = LittleFS.usedBytes();
+  size_t total = LittleFS.totalBytes();
+  char dateStr[11];
   //
+  display.setCursor(COL_1, ROW_1); display.print(F("Log File #")); display.print(session);
+  display.setCursor(COL_1, ROW_2); display.print(String(used) + " of " + String(total));
+  display.setCursor(COL_1, ROW_3); display.printf("%3.0f %%\n", percentUsed);
+  display.setCursor(40, ROW_3); 
+  if(!blnDisplayRtcDate) {
+    display.print(F("LOG:")); display.print(String(sessionDate));
+  } else {
+    GetTimeOrDateString(dateStr, false); // set dateStr to current date.
+    display.print(F("RTC:")); display.print(String(dateStr));
+  }
+}
+//
+//
+void DisplayWiFi(void) {
   display.setCursor(COL_1, ROW_1); display.print(F("WiFi"));
-  display.setCursor(71, ROW_1); display.print(F("Log Usage"));
-  display.setCursor(COL_1, ROW_2); display.print(F("A-On B-Off"));
-  display.setCursor(90, ROW_2); display.printf("%3.0f %%\n", percentUsed);
+  display.setCursor(40, ROW_1); display.print(F("A-On"));
+  display.setCursor(40, ROW_2); display.print(F("B-Off"));
   display.setCursor(COL_1, ROW_3);
   display.print(F("IP: "));
   if (WiFi.status() == WL_CONNECTED) {
@@ -109,12 +152,13 @@ void DisplayWiFi(void) {
 void ReadWeatherSensor(void) {
   float si7021Temperature = 0;
   float si7021Humidity = 0;
+  char timeStr[9];
   //
   display.invertDisplay(false);
   //
   display.setCursor(COL_1, ROW_3);
   if(!blnDisplaySeaLevelPressure) {
-    GetFormattedTime(); // populate timeStr with current time.
+    GetTimeOrDateString(timeStr, true); // set timeStr to current time.
     //
     if (!realTimeUpdate) {
       display.print(F("ZERO: "));
@@ -304,7 +348,7 @@ void ToggleLogDataFlag(void) {
   //
   if (blnLogData) {
     timerAppendLog.attach(INTERVAL_LOG, SetAppendDataToLogFlag);
-    SetAppendSessionNumToLogFIle(); // Add line to indicate a new session.
+    AppendSessionInfoToLogFIle(); // Add line to indicate a new session.
     SetAppendDataToLogFlag(); // First data log.
   } else {
     timerAppendLog.detach();
